@@ -14,44 +14,30 @@ LOOP:
     ; DATA:  GP0
     ; CLOCK: GP1
     ; LATCH: GP2
+
+    movlw   8                           
+    movwf   0x1a                        ; Use GP register A for loop counter
+
+    movlw   0b10110110                         
+    movwf   0x10                        ; Use GP register 0 to store the digit 0
+
     bcf     GPIO, GPIO_GP2_POSITION     ; Clear GP2 (set LATCH to LOW) 
-    
-    bsf     GPIO, GPIO_GP0_POSITION     ; Set GP0    (DATA = 1)
-    
+
+_data_loop:
+    bcf     GPIO, GPIO_GP0_POSITION     ; Clear GP0 (DATA = 0)
+
+    btfsc   0x10, 0                     ; Check if the last bit in GP reg 0 is set
+    bsf     GPIO, GPIO_GP0_POSITION     ; Set GP0 if last bit of GP reg 0 is set (DATA = 1)
+    rrf     0x10, F                     ; Bit shift right GP register 0
+        
                                         ;  -- PULSE CLOCK --
     bsf     GPIO, GPIO_GP1_POSITION     ; Set GP1   (set CLOCK to HIGH)
     bcf     GPIO, GPIO_GP1_POSITION     ; Clear GP1 (set CLOCK to LOW)
-    
-                                        ;  -- PULSE CLOCK -- 2
-    bsf     GPIO, GPIO_GP1_POSITION     ; Set GP1   (set CLOCK to HIGH)
-    bcf     GPIO, GPIO_GP1_POSITION     ; Clear GP1 (set CLOCK to LOW)
-    
-                                        ;  -- PULSE CLOCK -- 3
-    bsf     GPIO, GPIO_GP1_POSITION     ; Set GP1   (set CLOCK to HIGH)
-    bcf     GPIO, GPIO_GP1_POSITION     ; Clear GP1 (set CLOCK to LOW)
-    
-                                        ;  -- PULSE CLOCK -- 4
-    bsf     GPIO, GPIO_GP1_POSITION     ; Set GP1   (set CLOCK to HIGH)
-    bcf     GPIO, GPIO_GP1_POSITION     ; Clear GP1 (set CLOCK to LOW)
-    
-                                        ;  -- PULSE CLOCK -- 5
-    bsf     GPIO, GPIO_GP1_POSITION     ; Set GP1   (set CLOCK to HIGH)
-    bcf     GPIO, GPIO_GP1_POSITION     ; Clear GP1 (set CLOCK to LOW)
 
-    bcf     GPIO, GPIO_GP0_POSITION     ; Clear GP0 (DATA = 0)
-    
-                                        ;  -- PULSE CLOCK -- 6
-    bsf     GPIO, GPIO_GP1_POSITION     ; Set GP1   (set CLOCK to HIGH)
-    bcf     GPIO, GPIO_GP1_POSITION     ; Clear GP1 (set CLOCK to LOW)
-    
-                                        ;  -- PULSE CLOCK -- 7
-    bsf     GPIO, GPIO_GP1_POSITION     ; Set GP1   (set CLOCK to HIGH)
-    bcf     GPIO, GPIO_GP1_POSITION     ; Clear GP1 (set CLOCK to LOW)
-    
-                                        ;  -- PULSE CLOCK -- 8
-    bsf     GPIO, GPIO_GP1_POSITION     ; Set GP1   (set CLOCK to HIGH)
-    bcf     GPIO, GPIO_GP1_POSITION     ; Clear GP1 (set CLOCK to LOW)
-    
+    decfsz 0x1a, F
+    goto _data_loop   
+
+
     bsf     GPIO, GPIO_GP2_POSITION     ; Set GP2   (set LATCH to HIGH)
     goto    LOOP
     
