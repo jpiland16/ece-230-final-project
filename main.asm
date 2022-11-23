@@ -8,13 +8,15 @@ resetVec:
 INIT:
     movlw  ~(1 << 5)                  ; Enable GPIO2 by disabling T0CS = 5th bit
     option                            ; and copy this value into OPTION register
-    movlw  11111001B                  ; turn on GPIO 1 and 2
+    movlw  11111000B                  ; turn on GPIO 0, 1, and 2
     tris   GPIO                       ; Copy W into GPIO tristate register
 LOOP:
+    bsf    GPIO, GPIO_GP0_POSITION    ; Set GP0's bit to 1 (turn ON  GP0)
     bsf    GPIO, GPIO_GP1_POSITION    ; Set GP1's bit to 1 (turn ON  GP1)
     bcf    GPIO, GPIO_GP2_POSITION    ; Set GP2's bit to 0 (turn OFF GP2)
     call   DELAY
     call   DELAY
+    bcf    GPIO, GPIO_GP0_POSITION    ; Set GP0's bit to 0 (turn OFF GP0)
     bcf    GPIO, GPIO_GP1_POSITION    ; Set GP1's bit to 0 (turn OFF GP1)
     bsf    GPIO, GPIO_GP2_POSITION    ; Set GP2's bit to 1 (turn ON  GP2)
     call   DELAY
