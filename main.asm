@@ -12,16 +12,18 @@ INIT:
     tris   GPIO                       ; Copy W into GPIO tristate register
 LOOP:
     bsf    GPIO, GPIO_GP1_POSITION    ; Set GP1's bit to 1 (turn ON  GP1)
-    bcf    GPIO, GPIO_GP2_POSITION    ; Set GP1's bit to 0 (turn ON  GP1)
+    bcf    GPIO, GPIO_GP2_POSITION    ; Set GP2's bit to 0 (turn OFF GP2)
+    call   DELAY
     call   DELAY
     bcf    GPIO, GPIO_GP1_POSITION    ; Set GP1's bit to 0 (turn OFF GP1)
-    bsf    GPIO, GPIO_GP2_POSITION    ; Set GP1's bit to 1 (turn ON  GP1)
+    bsf    GPIO, GPIO_GP2_POSITION    ; Set GP2's bit to 1 (turn ON  GP2)
+    call   DELAY
     call   DELAY
     goto   LOOP
 DELAY:
     movlw  0
     movwf  0x10
-    movlw  81
+    movlw  200
     movwf  0x11
 DELAY_LOOP:
     decfsz 0x10, F
