@@ -15,16 +15,16 @@ LOOP:
 
     bcf     GPIO, GPIO_GP2_POSITION     ; Clear GP2 (set LATCH to LOW) 
 
-    movlw   0x12
-    movwf   FSR                         ; Set FSR = 16 + digit above
+    movlw   0x02
+    movwf   0x1a                         ; Set 0x1a to desired digit
     call    DISPLAY_DIGIT
     
     movlw   0x13
-    movwf   FSR                         ; Set FSR = 16 + digit above
+    movwf   0x1a                         ; Set 0x1a to desired digit
     call    DISPLAY_DIGIT
 
-    movlw   0x14
-    movwf   FSR                         ; Set FSR = 16 + digit above
+    movlw   0x04
+    movwf   0x1a                         ; Set 0x1a to desired digit
     call    DISPLAY_DIGIT
 
     bsf     GPIO, GPIO_GP2_POSITION     ; Set GP2   (set LATCH to HIGH)
@@ -32,12 +32,13 @@ LOOP:
     goto    LOOP
 
 DISPLAY_DIGIT:
+
+    ; PARAMETERS: 0x1a <3..0> contains the value of the desired digit to display
+    ;             0x1a <4>    is a flag to turn ON the decimal point
+
     ; DATA:  GP0
     ; CLOCK: GP1
     ; LATCH: GP2
-
-    movlw   8                           
-    movwf   0x1a                        ; Use GP register A for loop counter
 
     movlw   0b11111100                  ; [ A B C D E F     ]       
     movwf   0x10                        ; Use GP register 0 to store the digit 0
@@ -68,6 +69,29 @@ DISPLAY_DIGIT:
 
     movlw   0b11110110                  ; [ A B C D   F G   ]
     movwf   0x19                        ; Use GP register 9 to store the digit 9
+
+    btfss   0x1a, 4
+    goto    _no_decimal_point
+    movlw   0x01
+    addwf   0x10, F
+    addwf   0x11, F
+    addwf   0x12, F
+    addwf   0x13, F
+    addwf   0x14, F
+    addwf   0x15, F
+    addwf   0x16, F
+    addwf   0x17, F
+    addwf   0x18, F
+    addwf   0x19, F
+
+_no_decimal_point:
+    movf    0x1a, W
+    movwf   FSR
+    movlw   0b00010000
+    iorwf   FSR, F
+
+    movlw   8                           
+    movwf   0x1a                        ; Use GP register A for loop counter
 
 _data_loop:
     bcf     GPIO, GPIO_GP0_POSITION     ; Clear GP0 (DATA = 0)
