@@ -85,10 +85,10 @@ DISPLAY_DIGIT:
     addwf   0x19, F
 
 _no_decimal_point:
-    movf    0x1a, W
-    movwf   FSR
-    movlw   0b00010000
-    iorwf   FSR, F
+    movf    0x1a, W                     ; Copy file 0x1a in into W
+    movwf   FSR                         ; Copy 0x1a to FSR
+    movlw   0b00010000                  ; Ensure the indexing starts from 16 (GP regs)
+    iorwf   FSR, F                      ;  by using IOR to commit results to file FSR
 
     movlw   8                           
     movwf   0x1a                        ; Use GP register A for loop counter
