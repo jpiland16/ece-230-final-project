@@ -11,11 +11,25 @@ INIT:
     movlw   11111000B            ; turn on GPIO 0, 1, and 2
     tris    GPIO            ; Copy W into GPIO tristate register
 
-    movlw   2                           ; Attempt to display the digit at left
-    movwf   0x10                        ; Save the value in GP reg 0 (0x10)
-    movlw   0x10                        ; Move the value 0x10 into W
-    addwf   0x10, W                     ; Add 0x10 to the value of GP reg 0 (0x10, value = digit above)
+LOOP:
+
+    bcf     GPIO, GPIO_GP2_POSITION     ; Clear GP2 (set LATCH to LOW) 
+
+    movlw   0x12
     movwf   FSR                         ; Set FSR = 16 + digit above
+    call    DISPLAY_DIGIT
+    
+    movlw   0x13
+    movwf   FSR                         ; Set FSR = 16 + digit above
+    call    DISPLAY_DIGIT
+
+    movlw   0x14
+    movwf   FSR                         ; Set FSR = 16 + digit above
+    call    DISPLAY_DIGIT
+
+    bsf     GPIO, GPIO_GP2_POSITION     ; Set GP2   (set LATCH to HIGH)
+
+    goto    LOOP
 
 DISPLAY_DIGIT:
     ; DATA:  GP0
@@ -55,8 +69,6 @@ DISPLAY_DIGIT:
     movlw   0b11110110                  ; [ A B C D   F G   ]
     movwf   0x19                        ; Use GP register 9 to store the digit 9
 
-    bcf     GPIO, GPIO_GP2_POSITION     ; Clear GP2 (set LATCH to LOW) 
-
 _data_loop:
     bcf     GPIO, GPIO_GP0_POSITION     ; Clear GP0 (DATA = 0)
 
@@ -71,9 +83,7 @@ _data_loop:
     decfsz 0x1a, F
     goto _data_loop   
 
-
-    bsf     GPIO, GPIO_GP2_POSITION     ; Set GP2   (set LATCH to HIGH)
-    goto    DISPLAY_DIGIT
+    retlw   0
     
 END resetVec
 
