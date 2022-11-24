@@ -15,17 +15,38 @@ LOOP:
 
     bcf     GPIO, GPIO_GP2_POSITION     ; Clear GP2 (set LATCH to LOW) 
 
+    btfsc   GPIO, GPIO_GP3_POSITION     ; Skip next instruction if GP3 is LOW    
+    goto    _alt_digits
+
     movlw   0x02
-    movwf   0x1a                         ; Set 0x1a to desired digit
+    movwf   0x1a                        ; Set 0x1a to desired digit
     call    DISPLAY_DIGIT
     
     movlw   0x13
-    movwf   0x1a                         ; Set 0x1a to desired digit
+    movwf   0x1a                        ; Set 0x1a to desired digit
     call    DISPLAY_DIGIT
 
     movlw   0x04
-    movwf   0x1a                         ; Set 0x1a to desired digit
+    movwf   0x1a                        ; Set 0x1a to desired digit
     call    DISPLAY_DIGIT
+
+    goto    _endif
+
+_alt_digits:
+
+    movlw   0x05
+    movwf   0x1a                        ; Set 0x1a to desired digit
+    call    DISPLAY_DIGIT
+    
+    movlw   0x16
+    movwf   0x1a                        ; Set 0x1a to desired digit
+    call    DISPLAY_DIGIT
+
+    movlw   0x07
+    movwf   0x1a                        ; Set 0x1a to desired digit
+    call    DISPLAY_DIGIT
+
+_endif:
 
     bsf     GPIO, GPIO_GP2_POSITION     ; Set GP2   (set LATCH to HIGH)
 
