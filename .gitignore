@@ -2,4 +2,6 @@ build/**
 debug/**
 dist/**
 nbproject/**
+__pycache__/**
+.vscode/**
 Makefile
