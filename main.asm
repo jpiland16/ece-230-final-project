@@ -6,9 +6,12 @@
     PSECT resetVec,class=CODE,delta=2,abs
 
 #define C 0
+#define DC 1
 #define clrc    bcf     STATUS, C
 #define skpc    btfss   STATUS, C
 #define skpnc   btfsc   STATUS, C
+#define skpdc   btfss   STATUS, DC
+#define skpndc  btfsc   STATUS, DC
 
 #define bin             0x1a
 #define tens_and_ones   0x1b
@@ -181,21 +184,21 @@ BINARY_TO_BCD:
     addwf   bin, W                      ; so we can add the upper to the lower
     andlw   0b00001111                  ; lose the upper nibble (W is in BCD from now on)
     
-    skpnc                               ; if we carried a one (upper + lower > 16)
+    skpndc                              ; if we carried a one (upper + lower > 16)
     addwf   0x10, W  ; (addlw 0x16)     ; add 16 (the place value) (1s + 16 * 10s)
     
-    skpnc                               ; did that cause a carry from the 1's place?
+    skpndc                              ; did that cause a carry from the 1's place?
     addwf   0x11, W  ; (addlw 0x06)     ; if so, add the missing 6 (carry is only worth 10)
     
     addwf   0x11, W  ; (addlw 0x06)     ; fix max digit value by adding 6
     
-    skpc                                ; if was greater than 9, DC (carry) will be set
+    skpdc                               ; if was greater than 9, DC (carry) will be set
     addwf   0x12, W  ; (addlw -0x06)    ; if if it wasn't, get rid of that extra 6
     
     btfsc   bin, 4                      ; 16's place
     addwf   0x13, W  ; (addlw 0x16-1+6) ; add 16 - 1 and check for digit carry
     
-    skpc
+    skpdc
     addwf   0x12, W  ; (addlw -0x06)    ; if nothing carried, get rid of that 6
     
     btfsc   bin, 5                      ; 32nd's place

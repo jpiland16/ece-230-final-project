@@ -27,6 +27,7 @@ class PIC:
                 raise ValueError(f"{v} > 255, not allowed")
             ret = self.value + v
             self.parent.carry = int((ret & 256) != 0)
+            self.parent.digit_carry = int(((self.value & 15) + (v & 15)) > 15)
             ret = ret & 255
             return ret
 
@@ -46,6 +47,7 @@ class PIC:
     def __init__(self, print_base = "hex", has_addlw = False):
 
         self.carry = 0
+        self.digit_carry = 0
         self.W = PIC.Register(self)
         self.GP_REGS = [PIC.Register(self) for i in range(16)]
         self.print_base = print_base
@@ -165,6 +167,9 @@ class PIC:
                     if b == 0:
                         if self.carry == 0:
                             skip_next = True
+                    elif b == 1:
+                        if self.digit_carry == 0:
+                            skip_next = True
                     else:
                         raise NotImplementedError(
                             f"read of status bit {b} not yet implemented")
@@ -181,6 +186,9 @@ class PIC:
                 if f == STATUS:
                     if b == 0:
                         if self.carry == 1:
+                            skip_next = True
+                    elif b == 1:
+                        if self.digit_carry == 1:
                             skip_next = True
                     else:
                         raise NotImplementedError(
@@ -264,7 +272,7 @@ def load_instructions(file_name, start_line = None, stop_line = None):
 def run_test():
     instructions = load_instructions("main.asm", 152, 220)
     instructions = load_instructions("temp.asm")
-    pic = PIC("bin", True)
+    pic = PIC("hex", True)
     gp = [0x0a, 0x0c, 0x0b]
     pic.GP_REGS[0x0a].value = 10
     pic.run_instructions(instructions, verbosely=gp)
@@ -272,7 +280,7 @@ def run_test():
 
 def test_all():
     instructions = load_instructions("main.asm", 152, 220)
-    instructions = load_instructions("main2.asm")
+    # instructions = load_instructions("temp.asm")
     correct_count = 0
     for i in range(256):
         pic = PIC(has_addlw=True)
@@ -282,7 +290,7 @@ def test_all():
             f"{pic.GP_REGS[0x0c].value:02X}{pic.GP_REGS[0x0b].value:02X}"[-3:]
         expected = f"{i:03d}"
         equal = expected == result
-        print(expected, result, "***" if not equal else "")
+        # print(expected, result, "***" if not equal else "")
         if equal:
             correct_count += 1
     print(f"{correct_count} of 256 correct")
