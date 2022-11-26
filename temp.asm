@@ -1,4 +1,4 @@
-# COPIED FROM http://www.piclist.com/techref/microchip/math/radix/b2bhp-8b3d.htm
+; COPIED FROM http://www.piclist.com/techref/microchip/math/radix/b2bhp-8b3d.htm
 #define C 0
 #define DC 1
 #define clrc    bcf     STATUS, C
