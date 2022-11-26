@@ -10,9 +10,10 @@ STATUS = 3
 W = 0
 F = 1
 
-NON_EMPTY_LINE_RE = re.compile("^.*\w.*$")
-DEFINE_RE = re.compile("#define\s(\w+)\s+(.*)")
-INSTRUCTION_RE = re.compile("^\s+([a-zA-Z]+)\s*(.*)")
+NON_EMPTY_LINE_RE = re.compile("^.*\\w.*$")
+DEFINE_RE = re.compile("#define\\s(\\w+)\\s+(.*)")
+INSTRUCTION_RE = re.compile("^\\s+([a-zA-Z]+)\\s*(.*)")
+LABEL_RE = re.compile("^(\\w+)")
 
 class PIC:
 
@@ -59,16 +60,18 @@ class PIC:
             v = 256 + v
         return v
 
-    def run_instructions(self, instructions, callback = lambda i: 0, 
-        verbosely = []):
+    def run_instructions(self, instructions, labels = {}, 
+        callback = lambda i: 0, verbosely = []):
 
         if len(verbosely) > 0:
             self.print_registers(verbosely, header=True, vals=False)
 
         skip_next = False
-        counter = 0
+        cycle_counter = 0
+        program_counter = 0
 
-        for instruction, arguments in instructions:
+        while program_counter < len(instructions):
+            instruction, arguments = instructions[program_counter]
             n = instruction.lower()
             a = [self.eval_l(l) for l in arguments]
 
@@ -76,6 +79,7 @@ class PIC:
                 skip_next = False
                 if len(verbosely) > 0: 
                     print("SKIP", instruction, arguments)
+                program_counter += 1
                 continue
 
             if n == "movlw":
@@ -210,11 +214,13 @@ class PIC:
             else:
                 raise NotImplementedError(f"instruction {n} not implemented!")
 
-            callback(counter)
-            counter += 1
+            callback(cycle_counter)
+            cycle_counter += 1
             if len(verbosely) > 0:
                 print(instruction, arguments)
                 self.print_registers(verbosely)
+
+            program_counter += 1
 
     def print_registers(self, gp_regs = [], header = False, vals = True):
 
@@ -259,33 +265,52 @@ def load_instructions(file_name, start_line = None, stop_line = None):
     instructions = [l.split(";")[0] for l in non_empty_lines]
 
     instructions_parsed = []
+
+    cached_labels = []
+
+    labels_dict = {}
+
+    pc_indexer = 0
     
     for instruction in instructions:
         m = INSTRUCTION_RE.search(instruction)
+        l = LABEL_RE.search(instruction)
+        
+        if l != None:
+            cached_labels.append(l.groups()[0])
+
         if m != None:
+
+            for label in cached_labels:
+                if label in labels_dict:
+                    raise KeyError(f"label {label} used more than once!")
+                labels_dict[label] = pc_indexer
+            cached_labels = [] # clear cache
+
             ip = list(m.groups())
             ip[1] = ip[1].replace(" ", "").split(",")
             instructions_parsed.append(ip)
+            pc_indexer += 1
 
-    return instructions_parsed
+    return instructions_parsed, labels_dict
 
 def run_test():
-    instructions = load_instructions("main.asm", 152, 220)
-    instructions = load_instructions("temp.asm")
+    instructions, labels = load_instructions("main.asm", 152, 220)
+    instructions, labels = load_instructions("temp.asm")
     pic = PIC("hex", True)
     gp = [0x0a, 0x0c, 0x0b]
     pic.GP_REGS[0x0a].value = 10
-    pic.run_instructions(instructions, verbosely=gp)
+    pic.run_instructions(instructions, labels, verbosely=gp)
     # pic.print_registers(gp_regs=gp, header=True, vals=False); pic.print_registers(gp)
 
 def test_all():
-    instructions = load_instructions("main.asm", 152, 220)
-    # instructions = load_instructions("temp.asm")
+    instructions, labels = load_instructions("main.asm", 152, 220)
+    instructions, labels = load_instructions("temp.asm")
     correct_count = 0
     for i in range(256):
         pic = PIC(has_addlw=True)
         pic.GP_REGS[0x0a].value = i
-        pic.run_instructions(instructions)
+        pic.run_instructions(instructions, labels)
         result = \
             f"{pic.GP_REGS[0x0c].value:02X}{pic.GP_REGS[0x0b].value:02X}"[-3:]
         expected = f"{i:03d}"
