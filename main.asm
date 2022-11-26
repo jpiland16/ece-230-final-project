@@ -19,10 +19,10 @@
 
 resetVec:
 INIT:
-    movlw   ~(1 << 5)            ; Enable GPIO2 by disabling T0CS = 5th bit
-    option                ; and copy this value into OPTION register
-    movlw   11111000B            ; turn on GPIO 0, 1, and 2
-    tris    GPIO            ; Copy W into GPIO tristate register
+    movlw   ~(1 << 5)                   ; Enable GPIO2 by disabling T0CS = 5th bit
+    option                              ; and copy this value into OPTION register
+    movlw   11111000B                   ; turn on GPIO 0, 1, and 2
+    tris    GPIO                        ; Copy W into GPIO tristate register
 
     movlw   0
     movwf   0x1d
