@@ -24,14 +24,17 @@ class PIC:
             self.value = 0
             self.parent = parent
 
-        def add_value(self, v):
+        def add_value(self, v, c=True, dc=True, z=True):
             if v > 255:
                 raise ValueError(f"{v} > 255, not allowed")
             ret = self.value + v
-            self.parent.carry = int((ret & 256) != 0)
-            self.parent.digit_carry = int(((self.value & 15) + (v & 15)) > 15)
+            if c: # only modify C flag if allowed
+                self.parent.carry = int((ret & 256) != 0)
+            if dc: # only modify DC flag if allowed
+                self.parent.digit_carry = int(((self.value & 15) + (v & 15)) > 15)
             ret = ret & 255
-            self.zero = int(ret == 0)
+            if z: # only modify Z flag if allowed
+                self.zero = int(ret == 0)
             return ret
 
         def rr(self):
@@ -163,13 +166,12 @@ class PIC:
                 if f < 16:
                     raise NotImplementedError(
                         "decfsz for f < 16 not yet implemented")
-                prev_zero = self.zero
-                r = self.GP_REGS[f - 16].add_value(255)
+                r = self.GP_REGS[f - 16].add_value(255, 
+                    c=False, dc=False, z=False)
                 if d == F:
                     self.GP_REGS[f - 16].value = r
                 else:
                     self.W.value = r
-                self.zero = prev_zero # zero flag not affected by decfsz
                 if r == 0:
                     skip_next = True
 
@@ -214,7 +216,8 @@ class PIC:
                 if f < 16:
                     raise NotImplementedError(
                         "incf for f < 16 not yet implemented")
-                r = self.GP_REGS[f - 16].add_value(1)
+                r = self.GP_REGS[f - 16].add_value(1, 
+                    c=False, dc=False, z=True)
                 if d == F:
                     self.GP_REGS[f - 16].value = r
                 else:
@@ -458,7 +461,7 @@ def test_divide():
     pic.GP_REGS[0x02].value = 9   # divsr
     instructions, labels = load_instructions("div.asm")
     gp = [0, 1, 2, 3]
-    pic.run_instructions(instructions, labels, verbosely=gp, step=True)
+    pic.run_instructions(instructions, labels, verbosely=[], step=False)
     quotient  = pic.GP_REGS[0x01].value
     remainder = pic.GP_REGS[0x00].value
     print(f"quotient {quotient} remainder {remainder}")
