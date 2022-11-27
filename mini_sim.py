@@ -1,4 +1,5 @@
 import re
+import msvcrt
 
 CUSTOM_DEFINES = """
 #define STATUS 0x03
@@ -30,6 +31,7 @@ class PIC:
             self.parent.carry = int((ret & 256) != 0)
             self.parent.digit_carry = int(((self.value & 15) + (v & 15)) > 15)
             ret = ret & 255
+            self.zero = int(ret == 0)
             return ret
 
         def rr(self):
@@ -49,19 +51,34 @@ class PIC:
 
         self.carry = 0
         self.digit_carry = 0
+        self.zero = 0
         self.W = PIC.Register(self)
         self.GP_REGS = [PIC.Register(self) for i in range(16)]
         self.print_base = print_base
         self.has_addlw = has_addlw
+        self.stack = []
+
+    def push_onto_stack(self, addr):
+        if len(self.stack) < 2:
+            self.stack.append(addr)
+        else:
+            raise NotImplementedError("stack size greater than 2 not permitted")
+    
+    def pop_from_stack(self):
+        return self.stack.pop()
 
     def eval_l(self, v):
-        v = eval(v)
-        while v < 0: 
-            v = 256 + v
-        return v
+        try:
+            v = eval(v)
+            while v < 0: 
+                v = 256 + v
+            return v
+        except:
+            # labels for goto and call statements
+            return v
 
     def run_instructions(self, instructions, labels = {}, 
-        callback = lambda i: 0, verbosely = []):
+        callback = lambda i: 0, verbosely = [], step = False):
 
         if len(verbosely) > 0:
             self.print_registers(verbosely, header=True, vals=False)
@@ -71,6 +88,17 @@ class PIC:
         program_counter = 0
 
         while program_counter < len(instructions):
+
+            if step:
+                print(  "(press any key to continue, or q to quit...)", 
+                    end="", flush=True)
+                k = msvcrt.getch()
+                if k.decode() == "q" or ord(k) == 3: # CTRL-C
+                    print()
+                    raise KeyboardInterrupt
+                print("\r                                             \r", 
+                    end="", flush=True)
+
             instruction, arguments = instructions[program_counter]
             n = instruction.lower()
             a = [self.eval_l(l) for l in arguments]
@@ -103,6 +131,7 @@ class PIC:
                     raise NotImplementedError(
                         "clrf for f < 16 not yet implemented")
                 self.GP_REGS[f - 16].value = 0
+                self.zero = 1
 
             elif n == "addwf":
                 f = a[0]
@@ -115,6 +144,45 @@ class PIC:
                     self.GP_REGS[f - 16].value = r
                 else:
                     self.W.value = r
+
+            elif n == "subwf":
+                f = a[0]
+                d = a[1]
+                if f < 16:
+                    raise NotImplementedError(
+                        "subwf for f < 16 not yet implemented")
+                r = self.GP_REGS[f - 16].add_value((256 - self.W.value) & 255)
+                if d == F:
+                    self.GP_REGS[f - 16].value = r
+                else:
+                    self.W.value = r
+
+            elif n == "decfsz":
+                f = a[0]
+                d = a[1]
+                if f < 16:
+                    raise NotImplementedError(
+                        "decfsz for f < 16 not yet implemented")
+                prev_zero = self.zero
+                r = self.GP_REGS[f - 16].add_value(255)
+                if d == F:
+                    self.GP_REGS[f - 16].value = r
+                else:
+                    self.W.value = r
+                self.zero = prev_zero # zero flag not affected by decfsz
+                if r == 0:
+                    skip_next = True
+
+            elif n == "movf":
+                f = a[0]
+                d = a[1]
+                if f < 16:
+                    raise NotImplementedError(
+                        "movf for f < 16 not yet implemented")
+                value = self.GP_REGS[f - 16].value
+                self.zero = int(value == 0)
+                if d == W:
+                    self.W.value = value
 
             elif n == "rlf":
                 f = a[0]
@@ -174,6 +242,9 @@ class PIC:
                     elif b == 1:
                         if self.digit_carry == 0:
                             skip_next = True
+                    elif b == 2:
+                        if self.zero == 0:
+                            skip_next = True
                     else:
                         raise NotImplementedError(
                             f"read of status bit {b} not yet implemented")
@@ -194,22 +265,75 @@ class PIC:
                     elif b == 1:
                         if self.digit_carry == 1:
                             skip_next = True
+                    elif b == 2:
+                        if self.zero == 1:
+                            skip_next = True
                     else:
                         raise NotImplementedError(
                             f"read of status bit {b} not yet implemented")
                 elif f < 16:
-                    raise NotImplementedError(f"read of f == {f} not yet implemented")
+                    raise NotImplementedError(
+                        f"read of f == {f} not yet implemented")
                 elif (self.GP_REGS[f - 16].value & v) != 0:
                     skip_next = True         
 
+            elif n == "bcf":
+                f = a[0]
+                b = a[1]
+                v = 2 ** b
+                if f == STATUS:
+                    if b == 0:
+                        self.carry = 0
+                    elif b == 1:
+                        self.digit_carry = 0
+                    elif b == 2:
+                        self.zero = 0
+                    else:
+                        raise NotImplementedError(
+                            f"write of status bit {b} not yet implemented")
+                elif f < 16:
+                    raise NotImplementedError(
+                        f"write for f == {f} not yet implemented")
+                else:
+                    self.GP_REGS[f - 16].value = \
+                        self.GP_REGS[f - 16].value & (255 - v)
+
+            elif n == "bsf":
+                f = a[0]
+                b = a[1]
+                v = 2 ** b
+                if f == STATUS:
+                    if b == 0:
+                        self.carry = 1
+                    elif b == 1:
+                        self.digit_carry = 1
+                    elif b == 2:
+                        self.zero = 1
+                    else:
+                        raise NotImplementedError(
+                            f"write of status bit {b} not yet implemented")
+                elif f < 16:
+                    raise NotImplementedError(
+                        f"write for f == {f} not yet implemented")
+                else:
+                    self.GP_REGS[f - 16].value = self.GP_REGS[f - 16].value | v
+
             elif n == "retlw":
                 self.W.value = a[0]
+                program_counter = self.stack.pop() - 1 # because we do +1 later
 
             elif n == "addlw":
                 if self.has_addlw:
                     self.W.value = self.W.add_value(a[0])
                 else:
                     raise NotImplementedError("family does not support ADDLW")
+
+            elif n == "call":
+                self.push_onto_stack(program_counter + 1)
+                program_counter = labels[a[0]] - 1 # because we do +1 later
+
+            elif n == "goto":
+                program_counter = labels[a[0]] - 1 # because we do +1 later
 
             else:
                 raise NotImplementedError(f"instruction {n} not implemented!")
@@ -218,7 +342,9 @@ class PIC:
             cycle_counter += 1
             if len(verbosely) > 0:
                 print(instruction, arguments)
-                self.print_registers(verbosely)
+                self.print_registers(verbosely, header=step)
+            elif step:
+                self.print_registers(verbosely, True)
 
             program_counter += 1
 
@@ -235,19 +361,18 @@ class PIC:
 
 
         if header:
-            print(" W        | C " + "".join([f"| 0x{16 + i:02x}     " \
+            print(" W        | Z | DC | C " + "".join([f"| 0x{16 + i:02x}     " \
                 for i in gp_regs]))
-            print("----------|---" + "".join([f"|----------" for _ in gp_regs]))
+            print("----------|---|----|---" + "".join([f"|----------" for _ in gp_regs]))
         
         if not vals:
             return
 
-        print(f"{format(self.W.value)}| {self.carry} " + "".join(
+        print(f"{format(self.W.value)}| {self.zero} |  {self.digit_carry} " + 
+            f"| {self.carry} " + "".join(
             [f"|{format(self.GP_REGS[i].value)}" for i in gp_regs]
         ))
         
-
-
 def load_instructions(file_name, start_line = None, stop_line = None):
 
     file = open(file_name, "r").read()
@@ -326,8 +451,21 @@ def run_check():
     pic.W.add_value(0x41)
     print(pic.carry)
 
+def test_divide():
+    pic = PIC()
+    pic.GP_REGS[0x00].value = 0   # divhi
+    pic.GP_REGS[0x01].value = 54  # divlo
+    pic.GP_REGS[0x02].value = 9   # divsr
+    instructions, labels = load_instructions("div.asm")
+    gp = [0, 1, 2, 3]
+    pic.run_instructions(instructions, labels, verbosely=gp, step=True)
+    quotient  = pic.GP_REGS[0x01].value
+    remainder = pic.GP_REGS[0x00].value
+    print(f"quotient {quotient} remainder {remainder}")
+
 def main():
-    test_all()
+    test_divide()
+    # test_all()
     # run_test()
     # run_check()
 
