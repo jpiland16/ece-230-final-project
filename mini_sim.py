@@ -34,7 +34,7 @@ class PIC:
                 self.parent.digit_carry = int(((self.value & 15) + (v & 15)) > 15)
             ret = ret & 255
             if z: # only modify Z flag if allowed
-                self.zero = int(ret == 0)
+                self.parent.zero = int(ret == 0)
             return ret
 
         def rr(self):
@@ -461,13 +461,30 @@ def test_divide():
     pic.GP_REGS[0x02].value = 9   # divsr
     instructions, labels = load_instructions("div.asm")
     gp = [0, 1, 2, 3]
-    pic.run_instructions(instructions, labels, verbosely=[], step=False)
+    pic.run_instructions(instructions, labels, verbosely=gp, step=False)
     quotient  = pic.GP_REGS[0x01].value
     remainder = pic.GP_REGS[0x00].value
     print(f"quotient {quotient} remainder {remainder}")
 
+def test_divide_all():
+    DIVIDEND = 4080
+    for i in range(256):
+        pic = PIC()
+        pic.GP_REGS[0x00].value = DIVIDEND >> 8   # divhi
+        pic.GP_REGS[0x01].value = DIVIDEND & 255  # divlo
+        pic.GP_REGS[0x02].value = i   # divsr
+        instructions, labels = load_instructions("div.asm")
+        gp = [0, 1, 2, 3]
+        pic.run_instructions(instructions, labels, verbosely=[], step=False)
+        quotient  = pic.GP_REGS[0x01].value
+        remainder = pic.GP_REGS[0x00].value
+        expected = DIVIDEND // i if i != 0 else "inf"
+        print(expected, quotient, "***" if expected != quotient else "", 
+            pic.zero, pic.carry)
+
 def main():
-    test_divide()
+    test_divide_all()
+    # test_divide()
     # test_all()
     # run_test()
     # run_check()
