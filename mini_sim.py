@@ -233,6 +233,12 @@ class PIC:
             elif n == "andlw":
                 l = a[0]
                 self.W.value = self.W.value & l
+                self.zero = int(self.W.value == 0)
+
+            elif n == "iorlw":
+                l = a[0]
+                self.W.value = self.W.value | l
+                self.zero = int(self.W.value == 0)
 
             elif n == "btfsc":
                 f = a[0]
@@ -423,17 +429,16 @@ def load_instructions(file_name, start_line = None, stop_line = None):
     return instructions_parsed, labels_dict
 
 def run_test():
-    instructions, labels = load_instructions("main.asm", 152, 220)
-    instructions, labels = load_instructions("temp.asm")
+    instructions, labels = load_instructions("main.asm", 162, 255)
     pic = PIC("hex", True)
     gp = [0x0a, 0x0c, 0x0b]
-    pic.GP_REGS[0x0a].value = 10
-    pic.run_instructions(instructions, labels, verbosely=gp)
+    pic.GP_REGS[0x0a].value = 8
+    pic.run_instructions(instructions, labels, verbosely=gp, step=True)
     # pic.print_registers(gp_regs=gp, header=True, vals=False); pic.print_registers(gp)
 
 def test_all():
-    instructions, labels = load_instructions("main.asm", 152, 220)
-    instructions, labels = load_instructions("temp.asm")
+    instructions, labels = load_instructions("main.asm", 162, 267)
+    # instructions, labels = load_instructions("temp.asm")
     correct_count = 0
     for i in range(256):
         pic = PIC(has_addlw=True)
@@ -441,9 +446,9 @@ def test_all():
         pic.run_instructions(instructions, labels)
         result = \
             f"{pic.GP_REGS[0x0c].value:02X}{pic.GP_REGS[0x0b].value:02X}"[-3:]
-        expected = f"{i:03d}"
+        expected = f"{i*2:03d}"
         equal = expected == result
-        # print(expected, result, "***" if not equal else "")
+        print(expected, result, "***" if not equal else "")
         if equal:
             correct_count += 1
     print(f"{correct_count} of 256 correct")
@@ -483,9 +488,9 @@ def test_divide_all():
             pic.zero, pic.carry)
 
 def main():
-    test_divide_all()
+    # test_divide_all()
     # test_divide()
-    # test_all()
+    test_all()
     # run_test()
     # run_check()
 

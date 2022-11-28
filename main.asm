@@ -64,6 +64,8 @@ _wait_for_release:
     goto    LOOP
 
 DISPLAY_DIGIT:
+; (39 or 29 cycles) + 73 cycles
+; 104 cycles without DP, 114 cycles with DP (decimal point)
 
     ; PARAMETERS: 0x1a <3..0> contains the value of the desired digit to display
     ;             0x1a <4>    is a flag to turn ON the decimal point
@@ -126,6 +128,9 @@ _no_decimal_point:
     movwf   0x1a                        ; Use GP register A for loop counter
 
 _data_loop:
+    ; loops 1-7: 9 cycles
+    ; loop  8  : 8 cycles
+    ; 73 cycles total, including retlw
     bcf     GPIO, GPIO_GP0_POSITION     ; Clear GP0 (DATA = 0)
 
     btfsc   INDF, 0                     ; Check if the last bit in INDF (the register pointed to by FSR) is set
@@ -151,6 +156,7 @@ _data_loop:
 ; Outputs
 ;   hundreds - the hundreds digit of the BCD conversion
 ;   tens_and_ones - the tens and ones digits of the BCD conversion
+; 
 
 BINARY_TO_BCD:
 
@@ -218,10 +224,49 @@ BINARY_TO_BCD:
     movwf   tens_and_ones               ; save result
     btfsc   bin, 7                      ; remeber adding 28 - 8 for 128?
     incf    hundreds, F                 ; add the missing 100 if bit 7 is set
+
+
+    ; MODIFICATION: Display even values from 0 to 510 instead of integers 0-255
+    ; basically multiply everything by 2
+
+    ; we need to temporarily use register 0x10 to store our DC and C flags 
+    ; (bits 1 and zero, respectively)
     
+    clrf    0x10
+    clrc                                ; clear carry
+    rlf     hundreds, F                 ; hundreds = hundreds * 2
+    
+    movf    tens_and_ones, W            ; copy F to W
+    addwf   tens_and_ones, W            ; W = F + W
+    skpnc                               ; if carry
+    bsf     0x10, 0                     ;  then set flag    
+    skpndc                              ; if digit carry
+    bsf     0x10, 1                     ;  then set flag
+
+    btfsc   0x10, 0                     ; if carry
+    addwf   0x15, W ; addlw 0x60        ;  then add 6 to tens digit
+    btfsc   0x10, 0                     ; if carry
+    incf    hundreds, F                 ;  then increment hundreds
+
+    btfsc   0x10, 1                     ; if digit carry
+    addwf   0x11, W ; addlw 0x06        ;  then add 6 to ones digit
+    btfsc   0x10, 1                     ; if digit carry
+    iorlw   16                          ;  then increment tens by adding 16/16
+
+    addwf   0x11, W ; addlw 0x06        ; try adding 6 to ones place
+    skpdc                               ; if that didn't cause a digit carry
+    addwf   0x12, W ; addlw -0x06       ;  then remove the 6
+
+    addwf   0x15, W ; addlw 0x60        ; try adding 6 to tens place
+    skpnc                               ; if addwf caused a carry
+    incf    hundreds, F                 ;  then increment hundreds
+    skpc                                ; if addwf didn't cause a carry
+    addwf   0x17, W ; addlw -0x60       ;  then remove the 6
+
+    movwf   tens_and_ones
+
     retlw   0                           ; all done!
 
 
 END resetVec
-
 
