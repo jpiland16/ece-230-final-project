@@ -17,6 +17,18 @@
 #define tens_and_ones   0x1b
 #define hundreds        0x1c
 
+#define bf_carry 3, 0
+#define bf_zero 3, 2
+
+#define same 1
+
+#define stc bsf bf_carry
+#define clc bcf bf_carry
+
+#define f_divhi 0x10
+#define f_divlo 0x11
+#define f_divsr 0x12
+
 resetVec:
 INIT:
     movlw   ~(1 << 5)                   ; Enable GPIO2 by disabling T0CS = 5th bit
@@ -24,12 +36,16 @@ INIT:
     movlw   11111000B                   ; turn on GPIO 0, 1, and 2
     tris    GPIO                        ; Copy W into GPIO tristate register
 
-    movlw   0
-    movwf   0x1d
-
 LOOP:
 
-    movf    0x1d, W
+    movlw   1
+    movwf   f_divhi
+    clrf    f_divlo
+    movlw   4
+    movwf   f_divsr
+    call    Div
+
+    movf    f_divlo, W
     movwf   0x1a
 
     call    BINARY_TO_BCD               ; Hundreds is now in 0x1c, tens and ones in 0x1b
@@ -51,15 +67,6 @@ LOOP:
     call    DISPLAY_DIGIT
 
     bsf     GPIO, GPIO_GP2_POSITION     ; Set GP2   (set LATCH to HIGH)
-
-    btfss   GPIO, GPIO_GP3_POSITION     ; Don't loop yet if GP3 is HIGH
-    goto    LOOP
-
-_wait_for_release:
-    btfsc   GPIO, GPIO_GP3_POSITION     ; Exit infinite loop if GP3 is LOW
-    goto _wait_for_release
-
-    incf    0x1d, F
 
     goto    LOOP
 
@@ -267,6 +274,66 @@ BINARY_TO_BCD:
 
     retlw   0                           ; all done!
 
+;-[ Div ]--------------------------------------------------------------
+; MODIFIED FROM http://www.piclist.com/techref/microchip/math/div/16by8lz.htm
+
+; Call w/: Number in f_divhi:f_divlo, divisor in f_divsr.
+; Returns: Quotient in f_divlo, remainder in f_divhi. W set to 0.
+;          Carry set if error. Z if divide by zero, NZ if divide overflow.
+; Notes:   Works by left shifted subtraction.
+;          ** SPEED MAY DIFFER, modifications made by Jonathan Piland, 11/26/22.
+;          Size = 29, Speed(w/ call&ret) = 7 cycles if div by zero
+;          Speed = 94 minimum, 129 maximum cycles
+
+Div:
+
+    movlw 8
+    movwf 0x13       ; used for loop later
+
+    movlw 0
+    addwf f_divsr, W ; w = divisor + 0 (to test for div by zero and move F to W)
+    stc              ; set carry in case of error
+    btfsc bf_zero    ; if zero
+     retlw 0         ;   return (error C,Z)
+
+    call DivSkipHiShift
+
+_div_loop:
+
+    movf f_divsr, W ; because we constantly write the literal 0 to W
+
+    call DivCode
+
+    decfsz 0x13, F
+     goto _div_loop
+
+    rlf f_divlo, same ; C << lo << C
+
+    ; If the first subtract didn't underflow, and the carry was shifted
+    ; into the quotient, then it will be shifted back off the end by this
+    ; last RLF. This will automatically raise carry to indicate an error.
+    ; The divide will be accurate to quotients of 9-bits, but past that
+    ; the quotient and remainder will be bogus and carry will be set.
+
+    bcf bf_zero  ; NZ (in case of overflow error)
+    retlw 0      ; we are done!
+
+DivCode:
+    rlf f_divlo, same    ; C << lo << C
+    rlf f_divhi, same    ; C << hi << C
+    btfss bf_carry       ; if Carry
+     goto DivSkipHiShift ;
+    subwf f_divhi, same  ;   hi-=w
+    stc                  ;   ignore carry
+    retlw 0              ;   done
+                         ; endif
+DivSkipHiShift:
+    subwf f_divhi, same  ; hi-=w
+    btfsc bf_carry       ; if carry set
+     retlw 0             ;   done
+    addwf f_divhi, same  ; hi+=w
+    clc                  ; clear carry
+    retlw 0              ; done
 
 END resetVec
 

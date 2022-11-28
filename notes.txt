@@ -1,0 +1,28 @@
+choosing any speed...
+
+16 time constants elapsed between passes = 25.5 m/s
+
+ 25.5 m 
+--------   = 25.5 m/s
+  16T
+
+T = 1/16 s = 62.5 ms
+           = 62,500 processor cycles
+
+displaying 3 digits is ~350 processor cycles
+we need to display digits ~178 times in order to count one time constant
+
+###
+
+The above doesn't seem right. Let's incorporate the size of the tire...
+
+28" diameter --> 1 revolution is 87.96" = 0.00138833 mi.
+
+1 rev/s ~= 5 mi/hr  (= 4.998)
+
+therefore, speed in mph       ~=        4.9 / (number of seconds    per revolution)
+                               = 2 * 408.0  / (number of 1/163.265-seconds per rev)
+                               = 2 * 408.0  / (number of times 6.12499 ms  elapses)
+                               = 2 * 408.0  / (number of times 6125 insn completed)
+
+looks like it's going to be approximately 16 cycles of displaying for every count
