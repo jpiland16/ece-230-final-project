@@ -29,6 +29,8 @@
 #define f_divlo 0x11
 #define f_divsr 0x12
 
+#define loopCount 16
+
 resetVec:
 INIT:
     movlw   ~(1 << 5)                   ; Enable GPIO2 by disabling T0CS = 5th bit
@@ -36,17 +38,23 @@ INIT:
     movlw   11111000B                   ; turn on GPIO 0, 1, and 2
     tris    GPIO                        ; Copy W into GPIO tristate register
 
+    clrf    0x1d                        ; initialize speed   to 0
+    clrf    0x1e                        ; initialize time    to 0
+    movlw   loopCount
+    movwf   0x1f                        ; initialize down-counter
+
 LOOP:
 
-    movlw   1
-    movwf   f_divhi
-    clrf    f_divlo
-    movlw   4
-    movwf   f_divsr
-    call    Div
+    ; INFO: Certain registers are used to store state in this program, and
+    ; should NOT be modified outside of this loop! These include:
+    ;
+    ;   0x1d: current speed of bicycle in units of 0.2 mph
+    ;   0x1e: number of time constants elapsed since last revolution start
+    ;   0x1f: program loop counter
+    ;
 
-    movf    f_divlo, W
-    movwf   0x1a
+    movf    0x1d, W                     ; copy current speed to W
+    movwf   0x1a                        ; copy 
 
     call    BINARY_TO_BCD               ; Hundreds is now in 0x1c, tens and ones in 0x1b
 
@@ -68,7 +76,38 @@ LOOP:
 
     bsf     GPIO, GPIO_GP2_POSITION     ; Set GP2   (set LATCH to HIGH)
 
+    decfsz  0x1f, F                     ; count a program execution loop
+    goto _dont_increment_time
+
+    ; if we looped the desired number of times...
+    incf    0x1e, F                     ; count 1 time constant
+    movlw   loopCount
+    movwf   0x1f
+
+_dont_increment_time:
+
+    btfss   GPIO, GPIO_GP3_POSITION     ; if GP3 is HIGH, then don't LOOP yet...
     goto    LOOP
+
+    ; SPEED CALCULATION
+    movlw   15                          ; = 4080 // 256
+    movwf   f_divhi
+    movlw   240                         ; = 4080 % 256
+    movwf   f_divlo
+    movf    0x1e, W
+    movwf   f_divsr
+    call Div                            ; 4080 / number of time constants
+    movf    f_divlo, W                  ; copy quotient to W
+    movwf   0x1d                        ; and copy W to current speed
+    clrf    0x1e                        ; clear time counter
+    movlw   loopCount                   
+    movwf   0x1f
+
+_wait_release_pin:
+    btfsc GPIO, GPIO_GP3_POSITION       ; Exit infinite loop after GP3 goes LOW
+    goto _wait_release_pin
+
+    goto LOOP
 
 DISPLAY_DIGIT:
 ; (39 or 29 cycles) + 73 cycles
