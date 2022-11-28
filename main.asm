@@ -7,11 +7,14 @@
 
 #define C 0
 #define DC 1
+#define Z 2
 #define clrc    bcf     STATUS, C
 #define skpc    btfss   STATUS, C
 #define skpnc   btfsc   STATUS, C
 #define skpdc   btfss   STATUS, DC
 #define skpndc  btfsc   STATUS, DC
+#define skpz    btfss   STATUS, Z
+#define skpnz   btfsc   STATUS, Z
 
 #define bin             0x1a
 #define tens_and_ones   0x1b
@@ -29,7 +32,7 @@
 #define f_divlo 0x11
 #define f_divsr 0x12
 
-#define loopCount 16
+#define loopCount 13
 
 resetVec:
 INIT:
@@ -67,6 +70,7 @@ LOOP:
     
     swapf   0x1b, W                     ; Swap positions of tens and ones in F
     andlw   0b00001111                  ; Take the tens information only
+    iorlw   0b00010000                  ; add a decimal point
     movwf   0x1a                        ; Copy W to F
     call    DISPLAY_DIGIT
 
@@ -80,6 +84,16 @@ LOOP:
     goto _dont_increment_time
 
     ; if we looped the desired number of times...
+    movlw   1
+    addwf   0x1e, W                     ; first check if # time constants == 255
+    skpz                                ; if it is 255, then we have a problem:
+    goto _loop_count_less_than_255      
+
+    clrf    0x1d                        ;  --> you've stopped moving (speed = 0)
+    goto _dont_increment_time           ; now your speed is stuck at 0
+                                        ; until GP3 goes high again
+
+_loop_count_less_than_255:
     incf    0x1e, F                     ; count 1 time constant
     movlw   loopCount
     movwf   0x1f
